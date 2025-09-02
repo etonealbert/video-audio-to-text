@@ -1,0 +1,8 @@
+openai>=1.54.0
+pydub>=0.25.1
+python-dotenv>=1.0.1
+tqdm>=4.66.0
+ruff>=0.6.9
+mypy>=1.11.2
+ffmpeg-python>=0.2.0
+moviepy>=1.0.3
