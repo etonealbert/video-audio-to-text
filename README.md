@@ -271,7 +271,7 @@ If chunks are being split poorly:
 
 ## License
 
-[Add your license here]
+Licensed under the [MIT License](./LICENSE).
 
 ## Support
 
