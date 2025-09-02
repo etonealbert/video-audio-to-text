@@ -181,7 +181,7 @@ For optimal chunking results, you may need to adjust silence detection parameter
 # Install dependencies
 make venv
 source .venv/bin/activate
-
+source .venv/bin/activate && python -m transcriber.cli "inputs/МИАНовостиPythonSenior.WAV"
 # Or manually:
 pip install -r requirements.txt
 ```

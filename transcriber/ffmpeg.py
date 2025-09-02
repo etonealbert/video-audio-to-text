@@ -43,6 +43,52 @@ def ensure_ffmpeg_available() -> None:
         )
 
 
+def validate_media_file(file_path: Path) -> None:
+    """Validate that a media file appears to be in a supported format.
+    
+    Args:
+        file_path: Path to the media file
+        
+    Raises:
+        FFmpegError: If file appears to be corrupted or unsupported
+        FileNotFoundError: If file doesn't exist
+    """
+    if not file_path.exists():
+        raise FileNotFoundError(f"Media file not found: {file_path}")
+    
+    # Check file size
+    if file_path.stat().st_size == 0:
+        raise FFmpegError(f"Media file is empty: {file_path}")
+    
+    # For MP4 files, check for basic file structure
+    if file_path.suffix.lower() in {".mp4", ".m4a", ".m4v"}:
+        try:
+            with open(file_path, "rb") as f:
+                header = f.read(64)
+                
+            # MP4 files should start with an ftyp box or have recognizable structure
+            # Look for common MP4 signatures
+            if not any(signature in header for signature in [
+                b"ftyp",  # File type box
+                b"moov",  # Movie box
+                b"mdat",  # Media data box
+                b"mp4",   # MP4 brand
+                b"isom",  # ISO base media
+                b"M4A ",  # M4A brand
+                b"M4V ",  # M4V brand
+            ]):
+                raise FFmpegError(
+                    f"File does not appear to be a valid MP4: {file_path}\n"
+                    f"The file might be:\n"
+                    f"  - Corrupted or incomplete\n"
+                    f"  - Encrypted or password-protected\n"
+                    f"  - A different file type with wrong extension\n"
+                    f"Try re-downloading or re-creating the file."
+                )
+        except OSError as e:
+            raise FFmpegError(f"Cannot read media file {file_path}: {e}")
+
+
 def probe_media_file(file_path: Path) -> MediaInfo:
     """Probe media file to extract metadata.
     
@@ -57,8 +103,8 @@ def probe_media_file(file_path: Path) -> MediaInfo:
     """
     ensure_ffmpeg_available()
     
-    if not file_path.exists():
-        raise FileNotFoundError(f"Media file not found: {file_path}")
+    # Validate file before attempting to probe
+    validate_media_file(file_path)
     
     try:
         # Use ffprobe to get detailed media information
@@ -82,7 +128,26 @@ def probe_media_file(file_path: Path) -> MediaInfo:
         probe_data = json.loads(result.stdout)
         
     except subprocess.CalledProcessError as e:
-        raise FFmpegError(f"Failed to probe media file {file_path}: {e.stderr}")
+        error_msg = e.stderr.strip() if e.stderr else "Unknown ffprobe error"
+        
+        # Provide more helpful error messages for common issues
+        if "moov atom not found" in error_msg or "Invalid data found when processing input" in error_msg:
+            raise FFmpegError(
+                f"Media file appears to be corrupted or incomplete: {file_path}\n"
+                f"Common causes:\n"
+                f"  - File was not fully downloaded or copied\n"
+                f"  - File is encrypted or password-protected\n"
+                f"  - Recording was interrupted or failed\n"
+                f"  - File format is not actually MP4 despite the extension\n"
+                f"FFprobe error: {error_msg}"
+            )
+        elif "Permission denied" in error_msg:
+            raise FFmpegError(
+                f"Permission denied accessing media file: {file_path}\n"
+                f"Try: chmod 644 \"{file_path}\""
+            )
+        else:
+            raise FFmpegError(f"Failed to probe media file {file_path}: {error_msg}")
     except subprocess.TimeoutExpired:
         raise FFmpegError(f"Timeout while probing media file {file_path}")
     except json.JSONDecodeError as e:
