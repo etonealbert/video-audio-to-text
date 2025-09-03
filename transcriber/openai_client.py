@@ -22,15 +22,18 @@ class TranscriptionError(Exception):
 class OpenAITranscriptionClient:
     """OpenAI client with built-in retry logic for transcription."""
     
-    def __init__(self, api_key: str, model: str = "whisper-1"):
+    def __init__(self, api_key: str, model: str = "whisper-1", fallback_model: str = "whisper-1"):
         """Initialize the OpenAI client.
         
         Args:
             api_key: OpenAI API key
-            model: Model to use for transcription
+            model: Primary model to use for transcription
+            fallback_model: Fallback model if primary model fails
         """
         self.client = OpenAI(api_key=api_key)
         self.model = model
+        self.fallback_model = fallback_model
+        self._model_failed = False  # Track if primary model has failed
     
     def transcribe_file(
         self,
@@ -39,7 +42,7 @@ class OpenAITranscriptionClient:
         response_format: str = "text",
         max_retries: int = 3
     ) -> Dict[str, Any]:
-        """Transcribe an audio file with retry logic.
+        """Transcribe an audio file with retry logic and fallback support.
         
         Args:
             file_path: Path to the audio file
@@ -57,9 +60,12 @@ class OpenAITranscriptionClient:
         if not file_path.exists():
             raise FileNotFoundError(f"Audio file not found: {file_path}")
         
+        # Determine which model to use
+        current_model = self.fallback_model if self._model_failed else self.model
+        
         # Prepare transcription parameters
         params = {
-            "model": self.model,
+            "model": current_model,
             "response_format": response_format
         }
         
@@ -69,7 +75,7 @@ class OpenAITranscriptionClient:
         # Execute with retry logic
         for attempt in range(max_retries + 1):  # +1 for initial attempt
             try:
-                logger.info(f"Transcribing {file_path.name} (attempt {attempt + 1})")
+                logger.info(f"Transcribing {file_path.name} using {current_model} (attempt {attempt + 1})")
                 
                 with open(file_path, "rb") as audio_file:
                     response = self.client.audio.transcriptions.create(
@@ -133,8 +139,28 @@ class OpenAITranscriptionClient:
                     raise TranscriptionError(f"Server error after {max_retries} retries: {e}")
             
             except openai.BadRequestError as e:
-                # Don't retry on bad request errors (4xx except 429)
-                raise TranscriptionError(f"Bad request error: {e}")
+                # Check if this is a model-specific error that should trigger fallback
+                error_msg = str(e).lower()
+                if ("model" in error_msg or "not found" in error_msg) and not self._model_failed and self.model != self.fallback_model:
+                    logger.warning(f"Model {self.model} failed, switching to fallback {self.fallback_model}: {e}")
+                    self._model_failed = True
+                    # Restart the transcription with fallback model
+                    return self.transcribe_file(file_path, language, response_format, max_retries)
+                else:
+                    # Don't retry on other bad request errors (4xx except 429)
+                    raise TranscriptionError(f"Bad request error: {e}")
+            
+            except openai.NotFoundError as e:
+                # Handle model not found errors specifically
+                error_msg = str(e).lower()
+                if ("model" in error_msg or "not found" in error_msg) and not self._model_failed and self.model != self.fallback_model:
+                    logger.warning(f"Model {self.model} not found, switching to fallback {self.fallback_model}: {e}")
+                    self._model_failed = True
+                    # Restart the transcription with fallback model
+                    return self.transcribe_file(file_path, language, response_format, max_retries)
+                else:
+                    # Don't retry on other not found errors
+                    raise TranscriptionError(f"Not found error: {e}")
             
             except openai.AuthenticationError as e:
                 # Don't retry on authentication errors
@@ -179,14 +205,15 @@ class OpenAITranscriptionClient:
         return min(60.0, exponential_delay + jitter)
 
 
-def create_transcription_client(api_key: str, model: str = "whisper-1") -> OpenAITranscriptionClient:
+def create_transcription_client(api_key: str, model: str = "whisper-1", fallback_model: str = "whisper-1") -> OpenAITranscriptionClient:
     """Factory function to create a transcription client.
     
     Args:
         api_key: OpenAI API key
-        model: Model to use for transcription
+        model: Primary model to use for transcription
+        fallback_model: Fallback model if primary model fails
         
     Returns:
         Configured OpenAI transcription client
     """
-    return OpenAITranscriptionClient(api_key=api_key, model=model)
+    return OpenAITranscriptionClient(api_key=api_key, model=model, fallback_model=fallback_model)

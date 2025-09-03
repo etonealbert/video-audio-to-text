@@ -20,6 +20,7 @@ def transcribe_chunks(
     output_format: OutputFormat,
     language: str | None,
     model: str,
+    fallback_model: str,
     concurrency: int,
     output_basename: str,
     input_dir: Path,
@@ -31,7 +32,8 @@ def transcribe_chunks(
         chunks: List of audio chunks to transcribe
         output_format: Output format ("txt", "srt", "vtt")
         language: Optional language hint
-        model: OpenAI model to use
+        model: Primary OpenAI model to use
+        fallback_model: Fallback OpenAI model if primary fails
         concurrency: Number of concurrent API calls
         output_basename: Base name for output file
         input_dir: Directory to write output file
@@ -59,7 +61,7 @@ def transcribe_chunks(
         )
     
     # Create OpenAI client
-    client = create_transcription_client(api_key=api_key, model=model)
+    client = create_transcription_client(api_key=api_key, model=model, fallback_model=fallback_model)
     
     # Determine response format based on output needs
     api_response_format = "verbose_json" if output_format in {"srt", "vtt"} else "text"

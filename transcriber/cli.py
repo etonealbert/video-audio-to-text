@@ -37,7 +37,8 @@ Examples:
 
 Environment Variables:
   OPENAI_API_KEY            OpenAI API key (required)
-  OPENAI_MODEL              Model to use (default: whisper-1)
+  OPENAI_MODEL              Model to use (default: gpt-4o-mini-transcribe)
+  OPENAI_FALLBACK_MODEL     Fallback model (default: whisper-1)
   DEFAULT_BITRATE           Default audio bitrate (default: 128k)
   DEFAULT_MAX_CHUNK_MB      Default max chunk size (default: 24)
   DEFAULT_MIN_SILENCE_MS    Default min silence duration (default: 400)
@@ -139,7 +140,14 @@ For more information, see the README.md file.
         "--model",
         type=str,
         default=None,
-        help="OpenAI model to use (default: whisper-1)"
+        help="OpenAI model to use (default: gpt-4o-mini-transcribe)"
+    )
+    
+    parser.add_argument(
+        "--fallback-model",
+        type=str,
+        default=None,
+        help="Fallback model if primary model fails (default: whisper-1)"
     )
     
     parser.add_argument(
@@ -206,6 +214,7 @@ def main() -> None:
                 output_format=config.output_format,
                 language=config.language,
                 model=config.model,
+                fallback_model=config.fallback_model,
                 concurrency=config.concurrency,
                 output_basename=config.output_basename,
                 input_dir=config.input_dir,

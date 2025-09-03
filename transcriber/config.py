@@ -31,6 +31,7 @@ class AppConfig:
     # API settings
     openai_api_key: str
     model: str
+    fallback_model: str
     language: str | None
     concurrency: int
     
@@ -75,7 +76,8 @@ def load_config(args: Any) -> AppConfig:
         
         # API settings
         openai_api_key=api_key,
-        model=args.model or os.getenv("OPENAI_MODEL", "whisper-1"),
+        model=args.model or os.getenv("OPENAI_MODEL", "gpt-4o-mini-transcribe"),
+        fallback_model=getattr(args, 'fallback_model', None) or os.getenv("OPENAI_FALLBACK_MODEL", "whisper-1"),
         language=args.language,
         concurrency=args.concurrency or int(os.getenv("DEFAULT_CONCURRENCY", "1")),
         
