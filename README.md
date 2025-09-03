@@ -81,6 +81,9 @@ DEFAULT_CONCURRENCY=1
 # Transcribe to plain text
 python -m transcriber.cli audio.mp3
 
+# Basic transcription
+python -m transcriber.cli "inputs/interview-ptn.pcm" --pcm-sample-rate 24000 --pcm-channels 2 --pcm-bit-depth 16 --pcm-format s16le
+
 # Transcribe video with verbose output
 python -m transcriber.cli video.mp4 --verbose
 
