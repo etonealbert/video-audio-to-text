@@ -48,6 +48,20 @@ class MediaInfo:
     size_bytes: int
 
 
+@dataclass(frozen=True)
+class PCMConfig:
+    """Configuration for PCM file parameters."""
+    
+    sample_rate: int = 44100
+    channels: int = 2
+    bit_depth: int = 16
+    format: str = "s16le"  # signed 16-bit little-endian
+    
+    def get_ffmpeg_format(self) -> str:
+        """Get the FFmpeg format string for this PCM configuration."""
+        return self.format
+
+
 OutputFormat = Literal["txt", "srt", "vtt"]
 
 

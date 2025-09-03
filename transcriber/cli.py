@@ -33,6 +33,7 @@ Examples:
   python -m transcriber.cli video.mp4 --format srt --verbose
   python -m transcriber.cli large_file.wav --max-chunk-mb 20 --concurrency 2
   python -m transcriber.cli interview.m4a --language en --format vtt
+  python -m transcriber.cli raw_audio.pcm --pcm-sample-rate 48000 --pcm-channels 1
 
 Environment Variables:
   OPENAI_API_KEY            OpenAI API key (required)
@@ -42,6 +43,10 @@ Environment Variables:
   DEFAULT_MIN_SILENCE_MS    Default min silence duration (default: 400)
   DEFAULT_SILENCE_THRESHOLD Default silence threshold (default: -40)
   DEFAULT_CONCURRENCY       Default concurrency level (default: 1)
+  
+PCM File Support:
+  Use --pcm-* options to specify parameters for raw PCM files.
+  Common formats: s16le (16-bit signed LE), s24le (24-bit signed LE)
 
 For more information, see the README.md file.
         """
@@ -89,6 +94,37 @@ For more information, see the README.md file.
         type=int,
         default=None,
         help="Silence threshold in dB (default: -40)"
+    )
+    
+    # PCM file options
+    parser.add_argument(
+        "--pcm-sample-rate",
+        type=int,
+        default=44100,
+        help="Sample rate for PCM files in Hz (default: 44100)"
+    )
+    
+    parser.add_argument(
+        "--pcm-channels",
+        type=int,
+        default=2,
+        help="Number of channels for PCM files (default: 2)"
+    )
+    
+    parser.add_argument(
+        "--pcm-bit-depth",
+        type=int,
+        choices=[8, 16, 24, 32],
+        default=16,
+        help="Bit depth for PCM files (default: 16)"
+    )
+    
+    parser.add_argument(
+        "--pcm-format",
+        type=str,
+        choices=["s8", "s16le", "s16be", "s24le", "s24be", "s32le", "s32be", "u8", "u16le", "u16be"],
+        default="s16le",
+        help="PCM format (default: s16le - signed 16-bit little-endian)"
     )
     
     # API options
@@ -150,7 +186,8 @@ def main() -> None:
                 input_path=config.input_path,
                 bitrate=config.bitrate,
                 workspace=workspace,
-                max_chunk_mb=config.max_chunk_mb
+                max_chunk_mb=config.max_chunk_mb,
+                pcm_config=config.pcm_config
             )
             
             # Split into chunks

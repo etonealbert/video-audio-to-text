@@ -9,7 +9,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 
-from .types import OutputFormat
+from .types import OutputFormat, PCMConfig
 
 
 @dataclass(frozen=True)
@@ -36,6 +36,9 @@ class AppConfig:
     
     # Logging
     verbose: bool
+    
+    # PCM file configuration
+    pcm_config: PCMConfig
 
 
 def load_config(args: Any) -> AppConfig:
@@ -78,10 +81,18 @@ def load_config(args: Any) -> AppConfig:
         
         # Logging
         verbose=args.verbose,
+        
+        # PCM configuration
+        pcm_config=PCMConfig(
+            sample_rate=args.pcm_sample_rate,
+            channels=args.pcm_channels,
+            bit_depth=args.pcm_bit_depth,
+            format=args.pcm_format
+        ),
     )
 
 
 def validate_supported_format(file_path: Path) -> bool:
     """Check if the file format is supported."""
-    supported_extensions = {".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav"}
+    supported_extensions = {".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav", ".pcm"}
     return file_path.suffix.lower() in supported_extensions

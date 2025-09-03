@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from .types import MediaInfo
+from .types import MediaInfo, PCMConfig
 
 logger = logging.getLogger(__name__)
 
@@ -89,11 +89,53 @@ def validate_media_file(file_path: Path) -> None:
             raise FFmpegError(f"Cannot read media file {file_path}: {e}")
 
 
-def probe_media_file(file_path: Path) -> MediaInfo:
+def probe_pcm_file(file_path: Path, pcm_config: PCMConfig) -> MediaInfo:
+    """Create MediaInfo for a PCM file using provided configuration.
+    
+    Args:
+        file_path: Path to the PCM file
+        pcm_config: PCM file configuration
+        
+    Returns:
+        MediaInfo object with estimated metadata
+        
+    Raises:
+        FFmpegError: If file validation fails
+    """
+    if not file_path.exists():
+        raise FileNotFoundError(f"PCM file not found: {file_path}")
+    
+    if file_path.stat().st_size == 0:
+        raise FFmpegError(f"PCM file is empty: {file_path}")
+    
+    # Calculate duration from file size and PCM parameters
+    file_size_bytes = file_path.stat().st_size
+    bytes_per_sample = pcm_config.bit_depth // 8
+    bytes_per_second = pcm_config.sample_rate * pcm_config.channels * bytes_per_sample
+    duration_seconds = file_size_bytes / bytes_per_second
+    
+    # Estimate bitrate (PCM is uncompressed)
+    bitrate = pcm_config.sample_rate * pcm_config.channels * pcm_config.bit_depth
+    
+    logger.info(f"PCM file analysis: {duration_seconds:.1f}s, {pcm_config.sample_rate}Hz, "
+               f"{pcm_config.channels}ch, {pcm_config.bit_depth}bit")
+    
+    return MediaInfo(
+        duration_seconds=duration_seconds,
+        sample_rate=pcm_config.sample_rate,
+        channels=pcm_config.channels,
+        bitrate=bitrate,
+        format="pcm",
+        size_bytes=file_size_bytes
+    )
+
+
+def probe_media_file(file_path: Path, pcm_config: PCMConfig | None = None) -> MediaInfo:
     """Probe media file to extract metadata.
     
     Args:
         file_path: Path to the media file
+        pcm_config: PCM configuration if file is PCM format
         
     Returns:
         MediaInfo object with file metadata
@@ -101,6 +143,12 @@ def probe_media_file(file_path: Path) -> MediaInfo:
     Raises:
         FFmpegError: If probing fails
     """
+    # Handle PCM files specially
+    if file_path.suffix.lower() == ".pcm":
+        if pcm_config is None:
+            raise FFmpegError("PCM configuration required for PCM files")
+        return probe_pcm_file(file_path, pcm_config)
+    
     ensure_ffmpeg_available()
     
     # Validate file before attempting to probe
@@ -194,7 +242,8 @@ def extract_audio_to_mp3(
     input_path: Path,
     output_path: Path,
     bitrate: str = "128k",
-    sample_rate: int = 44100
+    sample_rate: int = 44100,
+    pcm_config: PCMConfig | None = None
 ) -> None:
     """Extract audio from media file and convert to MP3.
     
@@ -203,6 +252,7 @@ def extract_audio_to_mp3(
         output_path: Path for output MP3 file
         bitrate: Audio bitrate (e.g., "128k", "192k")
         sample_rate: Target sample rate in Hz
+        pcm_config: PCM configuration if input is PCM format
         
     Raises:
         FFmpegError: If conversion fails
@@ -216,8 +266,21 @@ def extract_audio_to_mp3(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
     try:
-        cmd = [
-            "ffmpeg",
+        # Build FFmpeg command
+        cmd = ["ffmpeg"]
+        
+        # Add PCM input format specification if needed
+        if input_path.suffix.lower() == ".pcm":
+            if pcm_config is None:
+                raise FFmpegError("PCM configuration required for PCM files")
+            
+            cmd.extend([
+                "-f", pcm_config.get_ffmpeg_format(),
+                "-ar", str(pcm_config.sample_rate),
+                "-ac", str(pcm_config.channels),
+            ])
+        
+        cmd.extend([
             "-i", str(input_path),
             "-vn",  # No video
             "-acodec", "libmp3lame",  # MP3 codec
@@ -226,7 +289,7 @@ def extract_audio_to_mp3(
             "-ac", "2",  # Stereo
             "-y",  # Overwrite output file
             str(output_path)
-        ]
+        ])
         
         logger.info(f"Converting {input_path} to MP3...")
         

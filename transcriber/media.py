@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .ffmpeg import extract_audio_to_mp3, probe_media_file, estimate_mp3_size
 from .io_utils import get_file_size, safe_filename
-from .types import MediaInfo, WorkspaceProtocol
+from .types import MediaInfo, WorkspaceProtocol, PCMConfig
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,8 @@ def ensure_mp3(
     input_path: Path,
     bitrate: str,
     workspace: WorkspaceProtocol,
-    max_chunk_mb: int = 24
+    max_chunk_mb: int = 24,
+    pcm_config: PCMConfig | None = None
 ) -> Path:
     """Ensure input file is converted to MP3 format if needed.
     
@@ -25,6 +26,7 @@ def ensure_mp3(
         bitrate: Target bitrate for MP3 conversion (e.g., "128k")
         workspace: Temporary workspace for file operations
         max_chunk_mb: Maximum chunk size in MB
+        pcm_config: PCM configuration if input is PCM format
         
     Returns:
         Path to MP3 file (either original or converted)
@@ -37,7 +39,7 @@ def ensure_mp3(
         raise FileNotFoundError(f"Input file not found: {input_path}")
     
     # Check if file extension is supported
-    supported_extensions = {".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav"}
+    supported_extensions = {".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav", ".pcm"}
     file_extension = input_path.suffix.lower()
     
     if file_extension not in supported_extensions:
@@ -48,7 +50,7 @@ def ensure_mp3(
     
     # Probe the media file to get information
     logger.info(f"Probing media file: {input_path}")
-    media_info = probe_media_file(input_path)
+    media_info = probe_media_file(input_path, pcm_config)
     
     logger.info(
         f"Media info - Duration: {media_info.duration_seconds:.1f}s, "
@@ -82,7 +84,8 @@ def ensure_mp3(
         input_path=input_path,
         output_path=mp3_path,
         bitrate=bitrate,
-        sample_rate=target_sample_rate
+        sample_rate=target_sample_rate,
+        pcm_config=pcm_config
     )
     
     # Verify the conversion was successful
