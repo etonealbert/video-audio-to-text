@@ -43,6 +43,13 @@ A powerful, GPU-accelerated Python command-line application for transcribing aud
 **macOS:**
 ```bash
 brew install ffmpeg
+
+
+.venv\Scripts\Activate.ps1
+
+.\scripts\transcribe.ps1 inputs\GRI-Sunlight-Python-bk.mp3
+
+
 ```
 
 **Ubuntu/Debian:**
