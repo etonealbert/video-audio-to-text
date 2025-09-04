@@ -1,22 +1,40 @@
 # Audio/Video Transcription Tool
 
-A clean, modular Python command-line application that transcribes audio or video files into text using OpenAI's Whisper API. The tool handles files of any size by intelligently splitting them into API-safe chunks while preserving timeline accuracy.
+A powerful, GPU-accelerated Python command-line application for transcribing audio or video files into text. Features **WhisperX** (CUDA-optimized) as the primary backend with **OpenAI Whisper API** as a legacy option. Includes advanced features like word-level alignment and speaker diarization.
 
 ## Features
 
-- **Multiple Format Support**: MP3, MP4, MPEG, MPGA, M4A, WAV
+### Core Transcription
+- **GPU-Accelerated**: WhisperX with CUDA support for 3-5x faster processing
+- **Multiple Format Support**: MP3, MP4, MPEG, MPGA, M4A, WAV, PCM
 - **Intelligent Chunking**: Splits large files using silence detection to avoid mid-word cuts
 - **Multiple Output Formats**: Plain text (`.txt`), SRT subtitles (`.srt`), WebVTT (`.vtt`)
-- **Robust Error Handling**: Exponential backoff retry logic for API reliability
-- **Configurable**: Environment variables and CLI arguments for all settings
+
+### Advanced Features (WhisperX)
+- **Word-Level Alignment**: Precise timing for each word
+- **Speaker Diarization**: Identify and label different speakers
+- **Batched Processing**: Efficient GPU memory usage
+- **Auto Device Detection**: Automatically uses CUDA when available
+
+### Reliability & Configuration
+- **Dual Backend Support**: WhisperX (default) or OpenAI API (legacy)
+- **Robust Error Handling**: Exponential backoff retry logic
+- **Highly Configurable**: Environment variables and CLI arguments
 - **Type-Safe**: Fully type-annotated codebase with mypy compliance
 - **Production Ready**: Comprehensive logging, cleanup, and error codes
 
 ## Requirements
 
+### Core Requirements
 - Python 3.10+
 - FFmpeg (for audio/video processing)
-- OpenAI API key
+
+### Backend Requirements
+- **WhisperX Backend** (recommended): CUDA-capable GPU (optional but recommended)
+- **OpenAI Backend** (legacy): OpenAI API key
+
+### Optional Features
+- **Speaker Diarization**: Hugging Face account and token
 
 ## Installation
 
@@ -25,6 +43,13 @@ A clean, modular Python command-line application that transcribes audio or video
 **macOS:**
 ```bash
 brew install ffmpeg
+
+
+.venv\Scripts\Activate.ps1
+
+.\scripts\transcribe.ps1 inputs\GRI-Sunlight-Python-bk.mp3
+
+
 ```
 
 **Ubuntu/Debian:**
@@ -34,107 +59,293 @@ sudo apt-get install ffmpeg
 ```
 
 **Windows:**
-```bash
+
+Option 1 - Using winget (Windows 10+):
+```powershell
 winget install ffmpeg
 ```
-Or download from [https://ffmpeg.org/](https://ffmpeg.org/)
 
-### 2. Clone and Setup
+Option 2 - Using Chocolatey:
+```powershell
+choco install ffmpeg
+```
 
+Option 3 - Manual installation:
+1. Download from [https://ffmpeg.org/download.html#build-windows](https://ffmpeg.org/download.html#build-windows)
+2. Extract to a folder (e.g., `C:\ffmpeg`)
+3. Add `C:\ffmpeg\bin` to your system PATH:
+   - Press `Win + R`, type `sysdm.cpl`, press Enter
+   - Click "Environment Variables"
+   - Under "System Variables", find and select "Path", click "Edit"
+   - Click "New" and add `C:\ffmpeg\bin`
+   - Click "OK" to save
+
+Verify installation:
+```powershell
+ffmpeg -version
+```
+
+### 2. Python Setup (Windows Only)
+
+> 📋 **For detailed Windows setup instructions, see [WINDOWS_SETUP.md](./WINDOWS_SETUP.md)**
+
+If you're on Windows and don't have Python installed:
+
+1. **Install Python 3.10+:**
+   - Download from [https://www.python.org/downloads/](https://www.python.org/downloads/)
+   - **IMPORTANT**: Check "Add Python to PATH" during installation
+   - Or use winget: `winget install Python.Python.3.11`
+
+2. **Verify Python installation:**
+   ```powershell
+   python --version
+   pip --version
+   ```
+
+3. **Enable PowerShell script execution (if needed):**
+   ```powershell
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+   ```
+
+### 3. Clone and Setup
+
+**Unix/macOS:**
 ```bash
 git clone <repository-url>
 cd video-audio-to-text
 
 # Create virtual environment
 python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
 ```
 
-### 3. Configure Environment
+**Windows PowerShell:**
+```powershell
+git clone <repository-url>
+cd video-audio-to-text
+
+# Create virtual environment
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+**Windows Command Prompt:**
+```cmd
+git clone <repository-url>
+cd video-audio-to-text
+
+# Create virtual environment
+python -m venv .venv
+.venv\Scripts\activate.bat
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 4. Configure Environment
 
 Copy the example environment file and configure it:
 
+**Unix/macOS:**
 ```bash
 cp env.example .env
+```
+
+**Windows:**
+```powershell
+Copy-Item env.example .env
 ```
 
 Edit `.env` with your settings:
 
 ```bash
+# Backend selection (whisperx recommended)
+TRANSCRIPTION_BACKEND=whisperx
+
+# WhisperX settings (recommended)
+WHISPERX_MODEL=large-v3
+WHISPERX_DEVICE=auto
+ENABLE_ALIGNMENT=true
+ENABLE_DIARIZATION=false
+
+# OpenAI settings (legacy backend)
 OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
-OPENAI_MODEL=whisper-1
+
+# Optional: Hugging Face token for speaker diarization
+HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxx
+
+# Audio processing
 DEFAULT_BITRATE=128k
 DEFAULT_MAX_CHUNK_MB=24
-DEFAULT_MIN_SILENCE_MS=400
-DEFAULT_SILENCE_THRESHOLD=-40
-DEFAULT_CONCURRENCY=1
 ```
 
 ## Usage
 
-### Basic Usage
+### Basic Usage (WhisperX - Default)
 
+**Unix/macOS:**
 ```bash
-# Transcribe to plain text
+# Basic transcription (GPU-accelerated)
 python -m transcriber.cli audio.mp3
 
-# Basic transcription
-python -m transcriber.cli "inputs/interview-ptn.pcm" --pcm-sample-rate 24000 --pcm-channels 2 --pcm-bit-depth 16 --pcm-format s16le
+# Generate SRT subtitles with speaker labels
+python -m transcriber.cli interview.m4a --format srt --enable-diarization
 
-# Transcribe video with verbose output
-python -m transcriber.cli video.mp4 --verbose
+# High-quality transcription with word alignment
+python -m transcriber.cli podcast.wav --format vtt --enable-alignment
 
-# Generate SRT subtitles
-python -m transcriber.cli interview.m4a --format srt
-
-# Generate WebVTT subtitles
-python -m transcriber.cli podcast.wav --format vtt
+# PCM file transcription
+python -m transcriber.cli "inputs/interview.pcm" \
+  --pcm-sample-rate 24000 --pcm-channels 2 --pcm-bit-depth 16 --pcm-format s16le
 ```
 
-### Advanced Options
+**Windows PowerShell:**
+```powershell
+# Basic transcription (GPU-accelerated)
+python -m transcriber.cli audio.mp3
 
+# Generate SRT subtitles with speaker labels
+python -m transcriber.cli interview.m4a --format srt --enable-diarization
+
+# High-quality transcription with word alignment
+python -m transcriber.cli podcast.wav --format vtt --enable-alignment
+
+# PCM file transcription (use quotes for paths with spaces)
+python -m transcriber.cli "inputs/interview.pcm" `
+  --pcm-sample-rate 24000 --pcm-channels 2 --pcm-bit-depth 16 --pcm-format s16le
+```
+
+### WhisperX Advanced Options
+
+**Unix/macOS:**
 ```bash
-# Large file with custom chunking
+# Large file with GPU optimization
 python -m transcriber.cli large_file.mp4 \
-  --max-chunk-mb 20 \
-  --min-silence-ms 500 \
-  --silence-threshold -35
+  --whisperx-model large-v3 \
+  --whisperx-batch-size 32 \
+  --whisperx-device cuda \
+  --enable-alignment \
+  --enable-diarization
 
-# Multiple concurrent API calls (use carefully!)
+# CPU-only processing
 python -m transcriber.cli audio.mp3 \
-  --concurrency 2 \
-  --verbose
+  --whisperx-device cpu \
+  --whisperx-compute-type int8
 
-# Specify language and custom bitrate
+# Specific language and model
 python -m transcriber.cli foreign_audio.wav \
   --language es \
-  --bitrate 192k
+  --whisperx-model medium \
+  --whisperx-compute-type float16
+```
+
+**Windows PowerShell:**
+```powershell
+# Large file with GPU optimization
+python -m transcriber.cli large_file.mp4 `
+  --whisperx-model large-v3 `
+  --whisperx-batch-size 32 `
+  --whisperx-device cuda `
+  --enable-alignment `
+  --enable-diarization
+
+# CPU-only processing
+python -m transcriber.cli audio.mp3 `
+  --whisperx-device cpu `
+  --whisperx-compute-type int8
+
+# Specific language and model
+python -m transcriber.cli foreign_audio.wav `
+  --language es `
+  --whisperx-model medium `
+  --whisperx-compute-type float16
+```
+
+### Legacy OpenAI API Usage
+
+**Unix/macOS:**
+```bash
+# Use OpenAI backend (requires API key)
+python -m transcriber.cli audio.mp3 \
+  --backend openai \
+  --model whisper-1 \
+  --concurrency 2
+
+# OpenAI with language hint
+python -m transcriber.cli foreign_audio.wav \
+  --backend openai \
+  --language es \
+  --model whisper-1
+```
+
+**Windows PowerShell:**
+```powershell
+# Use OpenAI backend (requires API key)
+python -m transcriber.cli audio.mp3 `
+  --backend openai `
+  --model whisper-1 `
+  --concurrency 2
+
+# OpenAI with language hint
+python -m transcriber.cli foreign_audio.wav `
+  --backend openai `
+  --language es `
+  --model whisper-1
 ```
 
 ### Command-Line Options
 
+#### Core Options
 ```
 positional arguments:
   input_path            Path to audio or video file to transcribe
 
-options:
+basic options:
+  --backend {whisperx,openai}
+                        Transcription backend (default: whisperx)
   --format {txt,srt,vtt}
                         Output format (default: txt)
-  --bitrate BITRATE     Audio bitrate for conversion (e.g., 128k, 192k)
-  --max-chunk-mb MAX_CHUNK_MB
-                        Maximum chunk size in MB (default: 24)
-  --min-silence-ms MIN_SILENCE_MS
-                        Minimum silence duration in milliseconds (default: 400)
-  --silence-threshold SILENCE_THRESHOLD
-                        Silence threshold in dB (default: -40)
-  --language LANGUAGE   Language hint for transcription (e.g., en, es, fr)
-  --model MODEL         OpenAI model to use (default: whisper-1)
-  --concurrency CONCURRENCY
-                        Number of concurrent API calls (default: 1)
+  --language LANGUAGE   Language hint (e.g., en, es, fr)
   --verbose             Enable verbose logging
+```
+
+#### WhisperX Options (Default Backend)
+```
+  --whisperx-model {tiny,base,small,medium,large,large-v2,large-v3}
+                        WhisperX model (default: large-v3)
+  --whisperx-device {cuda,cpu,auto}
+                        Device for inference (default: auto)
+  --whisperx-compute-type {int8,int16,float16,float32,auto}
+                        Compute precision (default: auto)
+  --whisperx-batch-size BATCH_SIZE
+                        Batch size for GPU inference (default: 16)
+  --enable-alignment    Enable word-level alignment
+  --enable-diarization  Enable speaker diarization
+  --hf-token HF_TOKEN   Hugging Face token (required for diarization)
+```
+
+#### OpenAI Options (Legacy Backend)
+```
+  --model MODEL         OpenAI model (default: gpt-4o-mini-transcribe)
+  --fallback-model MODEL
+                        Fallback model (default: whisper-1)
+  --concurrency CONCURRENCY
+                        Concurrent API calls (default: 1)
+```
+
+#### Audio Processing Options
+```
+  --bitrate BITRATE     Audio bitrate (e.g., 128k, 192k)
+  --max-chunk-mb SIZE   Maximum chunk size in MB (default: 24)
+  --min-silence-ms MS   Minimum silence duration (default: 400)
+  --silence-threshold DB
+                        Silence threshold in dB (default: -40)
 ```
 
 ## Output Files
@@ -159,15 +370,37 @@ The tool creates output files in the same directory as the input file:
 
 All settings can be configured via environment variables in the `.env` file:
 
+#### Backend Configuration
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OPENAI_API_KEY` | - | OpenAI API key (required) |
-| `OPENAI_MODEL` | `whisper-1` | Whisper model to use |
+| `TRANSCRIPTION_BACKEND` | `whisperx` | Backend to use (`whisperx` or `openai`) |
+
+#### WhisperX Settings
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WHISPERX_MODEL` | `large-v3` | WhisperX model to use |
+| `WHISPERX_DEVICE` | `auto` | Device for inference (`cuda`, `cpu`, `auto`) |
+| `WHISPERX_COMPUTE_TYPE` | `auto` | Compute precision (`int8`, `float16`, etc.) |
+| `WHISPERX_BATCH_SIZE` | `16` | Batch size for GPU inference |
+| `ENABLE_ALIGNMENT` | `true` | Enable word-level alignment |
+| `ENABLE_DIARIZATION` | `false` | Enable speaker diarization |
+| `HF_TOKEN` | - | Hugging Face token (required for diarization) |
+
+#### OpenAI Settings (Legacy)
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENAI_API_KEY` | - | OpenAI API key (required for openai backend) |
+| `OPENAI_MODEL` | `gpt-4o-mini-transcribe` | OpenAI model to use |
+| `OPENAI_FALLBACK_MODEL` | `whisper-1` | Fallback model |
+| `DEFAULT_CONCURRENCY` | `1` | Number of concurrent API calls |
+
+#### Audio Processing
+| Variable | Default | Description |
+|----------|---------|-------------|
 | `DEFAULT_BITRATE` | `128k` | Audio bitrate for conversion |
 | `DEFAULT_MAX_CHUNK_MB` | `24` | Maximum chunk size in MB |
 | `DEFAULT_MIN_SILENCE_MS` | `400` | Minimum silence duration for splitting |
 | `DEFAULT_SILENCE_THRESHOLD` | `-40` | Silence threshold in dB |
-| `DEFAULT_CONCURRENCY` | `1` | Number of concurrent API calls |
 
 ### Silence Detection Tuning
 
@@ -180,17 +413,43 @@ For optimal chunking results, you may need to adjust silence detection parameter
 
 ### Setup Development Environment
 
+**Unix/macOS (using Make):**
 ```bash
 # Install dependencies
 make venv
 source .venv/bin/activate
-source .venv/bin/activate && python -m transcriber.cli "inputs/МИАНовостиPythonSenior.WAV"
+
 # Or manually:
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+```
+
+**Windows PowerShell:**
+```powershell
+# Manual setup
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+# Or use the automated setup script (recommended)
+.\scripts\setup.ps1
+```
+
+**Windows Command Prompt:**
+```cmd
+# Manual setup
+python -m venv .venv
+.venv\Scripts\activate.bat
+pip install -r requirements.txt
+
+# Or use the automated setup script (recommended)
+scripts\setup.bat
 ```
 
 ### Code Quality
 
+**Unix/macOS:**
 ```bash
 # Format code
 make format
@@ -205,8 +464,26 @@ make type
 # or: mypy transcriber --strict
 ```
 
+**Windows PowerShell:**
+```powershell
+# Format code
+ruff format .
+
+# Lint code
+ruff check .
+
+# Type check
+mypy transcriber --strict
+
+# Or use the provided scripts (recommended)
+.\scripts\format.ps1
+.\scripts\lint.ps1
+.\scripts\type-check.ps1
+```
+
 ### Testing
 
+**Unix/macOS:**
 ```bash
 # Test with sample file
 python -m transcriber.cli sample.mp3 --verbose
@@ -214,6 +491,58 @@ python -m transcriber.cli sample.mp3 --verbose
 # Show help
 python -m transcriber.cli --help
 ```
+
+**Windows PowerShell:**
+```powershell
+# Test with sample file
+python -m transcriber.cli sample.mp3 --verbose
+
+# Show help
+python -m transcriber.cli --help
+
+# Test recording and transcription (Windows-specific)
+cd C:\Users\alber\Helpers
+$file = "rec_$((Get-Date).ToString('yyyyMMdd_HHmmss')).mp3"
+
+# Record audio using virtual audio capturer
+ffmpeg -y -f dshow -i audio="virtual-audio-capturer" `
+  -ac 2 -ar 48000 -c:a libmp3lame -b:a 192k $file
+
+# Or record to WAV
+ffmpeg -y -f dshow -i audio="virtual-audio-capturer" out.wav
+```
+
+## Windows Scripts
+
+> 📋 **For complete Windows setup instructions, see [WINDOWS_SETUP.md](./WINDOWS_SETUP.md)**
+
+The `scripts/` directory contains Windows-specific helper scripts for easier project management:
+
+### PowerShell Scripts (Recommended)
+
+- **Setup**: `.\scripts\setup.ps1` - Complete project setup with virtual environment
+- **Transcription**: `.\scripts\transcribe.ps1` - Enhanced transcription with parameter support
+- **Development**: `.\scripts\format.ps1`, `.\scripts\lint.ps1`, `.\scripts\type-check.ps1`
+- **Cleanup**: `.\scripts\clean.ps1` - Clean temporary files and caches
+
+### Batch Scripts (CMD Compatible)
+
+- **Setup**: `scripts\setup.bat` - Basic project setup
+- **Transcription**: `scripts\run-transcriber.bat` - Simple transcription wrapper
+
+### Quick Start with Scripts
+
+```powershell
+# PowerShell (recommended)
+.\scripts\setup.ps1                    # Set up everything
+.\scripts\transcribe.ps1 audio.mp3 -VerboseLogging     # Transcribe a file
+
+# Command Prompt
+scripts\setup.bat                      # Set up everything  
+scripts\run-transcriber.bat audio.mp3  # Transcribe a file
+```
+
+See `scripts/README.md` for detailed documentation on all available scripts.
 
 ## Troubleshooting
 
@@ -250,6 +579,36 @@ If chunks are being split poorly:
 - Modify `--silence-threshold` (try -30 to -50 dB)
 - Check audio quality and background noise levels
 
+### Windows-Specific Issues
+
+**PowerShell Execution Policy Error:**
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+**Python Command Not Found (Windows):**
+- Ensure Python is installed from [python.org](https://www.python.org/downloads/)
+- During installation, check "Add Python to PATH"
+- Restart your terminal after installation
+
+**Virtual Environment Activation Issues:**
+```powershell
+# PowerShell
+.venv\Scripts\Activate.ps1
+
+# Command Prompt
+.venv\Scripts\activate.bat
+```
+
+**Path Issues with Spaces:**
+Use quotes around file paths containing spaces:
+```powershell
+python -m transcriber.cli "C:\My Files\audio file.mp3"
+```
+
+**Permission Denied Errors:**
+Run PowerShell or Command Prompt as Administrator if you encounter permission issues during setup.
+
 ## Exit Codes
 
 - `0`: Success
@@ -260,10 +619,24 @@ If chunks are being split poorly:
 
 ## Performance Notes
 
+### WhisperX (Default Backend)
+- **GPU acceleration**: 3-5x faster than CPU with CUDA
+- **Batched processing**: Efficient memory usage with configurable batch sizes
+- **Memory requirements**: 4-8GB VRAM for large models on GPU
+- **CPU fallback**: Automatic fallback to CPU if CUDA unavailable
+- **Processing speed**: ~10-30x real-time on GPU, ~2-5x on CPU
+
+### OpenAI API (Legacy Backend)
 - **Single chunk**: Files ≤24MB process as one chunk
 - **Chunking overhead**: ~2-5 seconds per chunk for splitting
 - **API timing**: ~1-3 seconds per minute of audio
 - **Concurrent processing**: Use with caution due to rate limits
+
+### Hardware Recommendations
+- **GPU**: NVIDIA GPU with 6GB+ VRAM for optimal performance
+- **CPU**: Modern multi-core processor for CPU fallback
+- **RAM**: 8GB+ system RAM for large file processing
+- **Storage**: SSD recommended for faster I/O during chunking
 
 ## Contributing
 

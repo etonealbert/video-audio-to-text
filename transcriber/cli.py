@@ -25,25 +25,46 @@ def create_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         prog="transcriber",
-        description="Transcribe audio or video files using OpenAI's Whisper API",
+        description="Transcribe audio or video files using WhisperX (GPU-accelerated) or OpenAI's Whisper API",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # WhisperX (GPU-accelerated, default)
   python -m transcriber.cli audio.mp3
-  python -m transcriber.cli video.mp4 --format srt --verbose
-  python -m transcriber.cli large_file.wav --max-chunk-mb 20 --concurrency 2
-  python -m transcriber.cli interview.m4a --language en --format vtt
+  python -m transcriber.cli video.mp4 --format srt --enable-alignment --enable-diarization
+  python -m transcriber.cli large_file.wav --whisperx-model large-v3 --whisperx-batch-size 32
+  
+  # OpenAI API (legacy)
+  python -m transcriber.cli audio.mp3 --backend openai --concurrency 2
+  python -m transcriber.cli interview.m4a --backend openai --language en --format vtt
+  
+  # PCM files
   python -m transcriber.cli raw_audio.pcm --pcm-sample-rate 48000 --pcm-channels 1
 
 Environment Variables:
-  OPENAI_API_KEY            OpenAI API key (required)
+  # Backend selection
+  TRANSCRIPTION_BACKEND     Backend to use: "whisperx" or "openai" (default: whisperx)
+  
+  # OpenAI settings (when using openai backend)
+  OPENAI_API_KEY            OpenAI API key (required for openai backend)
   OPENAI_MODEL              Model to use (default: gpt-4o-mini-transcribe)
   OPENAI_FALLBACK_MODEL     Fallback model (default: whisper-1)
+  
+  # WhisperX settings (when using whisperx backend)
+  WHISPERX_MODEL            WhisperX model (default: large-v3)
+  WHISPERX_DEVICE           Device: "cuda", "cpu", "auto" (default: auto)
+  WHISPERX_COMPUTE_TYPE     Compute type: "int8", "float16", etc. (default: auto)
+  WHISPERX_BATCH_SIZE       Batch size for inference (default: 16)
+  ENABLE_ALIGNMENT          Enable word-level alignment (default: true)
+  ENABLE_DIARIZATION        Enable speaker diarization (default: false)
+  HF_TOKEN                  Hugging Face token (required for diarization)
+  
+  # Audio processing
   DEFAULT_BITRATE           Default audio bitrate (default: 128k)
   DEFAULT_MAX_CHUNK_MB      Default max chunk size (default: 24)
   DEFAULT_MIN_SILENCE_MS    Default min silence duration (default: 400)
   DEFAULT_SILENCE_THRESHOLD Default silence threshold (default: -40)
-  DEFAULT_CONCURRENCY       Default concurrency level (default: 1)
+  DEFAULT_CONCURRENCY       Default concurrency level (default: 1, OpenAI only)
   
 PCM File Support:
   Use --pcm-* options to specify parameters for raw PCM files.
@@ -128,7 +149,16 @@ For more information, see the README.md file.
         help="PCM format (default: s16le - signed 16-bit little-endian)"
     )
     
-    # API options
+    # Backend selection
+    parser.add_argument(
+        "--backend",
+        type=str,
+        choices=["whisperx", "openai"],
+        default=None,
+        help="Transcription backend to use (default: whisperx)"
+    )
+    
+    # Common options
     parser.add_argument(
         "--language",
         type=str,
@@ -136,6 +166,7 @@ For more information, see the README.md file.
         help="Language hint for transcription (e.g., en, es, fr)"
     )
     
+    # OpenAI API options (legacy)
     parser.add_argument(
         "--model",
         type=str,
@@ -154,7 +185,58 @@ For more information, see the README.md file.
         "--concurrency",
         type=int,
         default=None,
-        help="Number of concurrent API calls (default: 1)"
+        help="Number of concurrent API calls for OpenAI backend (default: 1)"
+    )
+    
+    # WhisperX options
+    parser.add_argument(
+        "--whisperx-model",
+        type=str,
+        choices=["tiny", "base", "small", "medium", "large", "large-v2", "large-v3"],
+        default=None,
+        help="WhisperX model to use (default: large-v3)"
+    )
+    
+    parser.add_argument(
+        "--whisperx-device",
+        type=str,
+        choices=["cuda", "cpu", "auto"],
+        default=None,
+        help="Device for WhisperX inference (default: auto)"
+    )
+    
+    parser.add_argument(
+        "--whisperx-compute-type",
+        type=str,
+        choices=["int8", "int16", "float16", "float32", "auto"],
+        default=None,
+        help="Compute type for WhisperX (default: auto)"
+    )
+    
+    parser.add_argument(
+        "--whisperx-batch-size",
+        type=int,
+        default=None,
+        help="Batch size for WhisperX inference (default: 16)"
+    )
+    
+    parser.add_argument(
+        "--enable-alignment",
+        action="store_true",
+        help="Enable word-level alignment (WhisperX only)"
+    )
+    
+    parser.add_argument(
+        "--enable-diarization",
+        action="store_true",
+        help="Enable speaker diarization (WhisperX only, requires HF token)"
+    )
+    
+    parser.add_argument(
+        "--hf-token",
+        type=str,
+        default=None,
+        help="Hugging Face token for speaker diarization models"
     )
     
     # Logging options
@@ -213,12 +295,22 @@ def main() -> None:
                 chunks=chunks,
                 output_format=config.output_format,
                 language=config.language,
+                output_basename=config.output_basename,
+                input_dir=config.input_dir,
+                backend=config.backend,
+                # OpenAI settings
+                api_key=config.openai_api_key,
                 model=config.model,
                 fallback_model=config.fallback_model,
                 concurrency=config.concurrency,
-                output_basename=config.output_basename,
-                input_dir=config.input_dir,
-                api_key=config.openai_api_key
+                # WhisperX settings
+                whisperx_model=config.whisperx_model,
+                whisperx_device=config.whisperx_device,
+                whisperx_compute_type=config.whisperx_compute_type,
+                whisperx_batch_size=config.whisperx_batch_size,
+                enable_alignment=config.enable_alignment,
+                enable_diarization=config.enable_diarization,
+                hf_token=config.hf_token
             )
         
         print(f"Transcription completed successfully: {output_path}")

@@ -19,12 +19,25 @@ class Chunk:
 
 
 @dataclass(frozen=True)
+class WordAlignment:
+    """Represents word-level alignment data."""
+    
+    word: str
+    start: float
+    end: float
+    probability: float
+    speaker: str | None = None
+
+
+@dataclass(frozen=True)
 class TranscriptionSegment:
     """Represents a timestamped transcription segment."""
     
     start: float
     end: float
     text: str
+    speaker: str | None = None
+    words: list[WordAlignment] | None = None
 
 
 @dataclass(frozen=True)
