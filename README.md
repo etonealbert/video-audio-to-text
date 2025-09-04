@@ -1,22 +1,40 @@
 # Audio/Video Transcription Tool
 
-A clean, modular Python command-line application that transcribes audio or video files into text using OpenAI's Whisper API. The tool handles files of any size by intelligently splitting them into API-safe chunks while preserving timeline accuracy.
+A powerful, GPU-accelerated Python command-line application for transcribing audio or video files into text. Features **WhisperX** (CUDA-optimized) as the primary backend with **OpenAI Whisper API** as a legacy option. Includes advanced features like word-level alignment and speaker diarization.
 
 ## Features
 
-- **Multiple Format Support**: MP3, MP4, MPEG, MPGA, M4A, WAV
+### Core Transcription
+- **GPU-Accelerated**: WhisperX with CUDA support for 3-5x faster processing
+- **Multiple Format Support**: MP3, MP4, MPEG, MPGA, M4A, WAV, PCM
 - **Intelligent Chunking**: Splits large files using silence detection to avoid mid-word cuts
 - **Multiple Output Formats**: Plain text (`.txt`), SRT subtitles (`.srt`), WebVTT (`.vtt`)
-- **Robust Error Handling**: Exponential backoff retry logic for API reliability
-- **Configurable**: Environment variables and CLI arguments for all settings
+
+### Advanced Features (WhisperX)
+- **Word-Level Alignment**: Precise timing for each word
+- **Speaker Diarization**: Identify and label different speakers
+- **Batched Processing**: Efficient GPU memory usage
+- **Auto Device Detection**: Automatically uses CUDA when available
+
+### Reliability & Configuration
+- **Dual Backend Support**: WhisperX (default) or OpenAI API (legacy)
+- **Robust Error Handling**: Exponential backoff retry logic
+- **Highly Configurable**: Environment variables and CLI arguments
 - **Type-Safe**: Fully type-annotated codebase with mypy compliance
 - **Production Ready**: Comprehensive logging, cleanup, and error codes
 
 ## Requirements
 
+### Core Requirements
 - Python 3.10+
 - FFmpeg (for audio/video processing)
-- OpenAI API key
+
+### Backend Requirements
+- **WhisperX Backend** (recommended): CUDA-capable GPU (optional but recommended)
+- **OpenAI Backend** (legacy): OpenAI API key
+
+### Optional Features
+- **Speaker Diarization**: Hugging Face account and token
 
 ## Installation
 
@@ -64,77 +82,131 @@ cp env.example .env
 Edit `.env` with your settings:
 
 ```bash
+# Backend selection (whisperx recommended)
+TRANSCRIPTION_BACKEND=whisperx
+
+# WhisperX settings (recommended)
+WHISPERX_MODEL=large-v3
+WHISPERX_DEVICE=auto
+ENABLE_ALIGNMENT=true
+ENABLE_DIARIZATION=false
+
+# OpenAI settings (legacy backend)
 OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
-OPENAI_MODEL=whisper-1
+
+# Optional: Hugging Face token for speaker diarization
+HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxx
+
+# Audio processing
 DEFAULT_BITRATE=128k
 DEFAULT_MAX_CHUNK_MB=24
-DEFAULT_MIN_SILENCE_MS=400
-DEFAULT_SILENCE_THRESHOLD=-40
-DEFAULT_CONCURRENCY=1
 ```
 
 ## Usage
 
-### Basic Usage
+### Basic Usage (WhisperX - Default)
 
 ```bash
-# Transcribe to plain text
+# Basic transcription (GPU-accelerated)
 python -m transcriber.cli audio.mp3
 
-# Basic transcription
-python -m transcriber.cli "inputs/interview-ptn.pcm" --pcm-sample-rate 24000 --pcm-channels 2 --pcm-bit-depth 16 --pcm-format s16le
+# Generate SRT subtitles with speaker labels
+python -m transcriber.cli interview.m4a --format srt --enable-diarization
 
-# Transcribe video with verbose output
-python -m transcriber.cli video.mp4 --verbose
+# High-quality transcription with word alignment
+python -m transcriber.cli podcast.wav --format vtt --enable-alignment
 
-# Generate SRT subtitles
-python -m transcriber.cli interview.m4a --format srt
-
-# Generate WebVTT subtitles
-python -m transcriber.cli podcast.wav --format vtt
+# PCM file transcription
+python -m transcriber.cli "inputs/interview.pcm" \
+  --pcm-sample-rate 24000 --pcm-channels 2 --pcm-bit-depth 16 --pcm-format s16le
 ```
 
-### Advanced Options
+### WhisperX Advanced Options
 
 ```bash
-# Large file with custom chunking
+# Large file with GPU optimization
 python -m transcriber.cli large_file.mp4 \
-  --max-chunk-mb 20 \
-  --min-silence-ms 500 \
-  --silence-threshold -35
+  --whisperx-model large-v3 \
+  --whisperx-batch-size 32 \
+  --whisperx-device cuda \
+  --enable-alignment \
+  --enable-diarization
 
-# Multiple concurrent API calls (use carefully!)
+# CPU-only processing
 python -m transcriber.cli audio.mp3 \
-  --concurrency 2 \
-  --verbose
+  --whisperx-device cpu \
+  --whisperx-compute-type int8
 
-# Specify language and custom bitrate
+# Specific language and model
 python -m transcriber.cli foreign_audio.wav \
   --language es \
-  --bitrate 192k
+  --whisperx-model medium \
+  --whisperx-compute-type float16
+```
+
+### Legacy OpenAI API Usage
+
+```bash
+# Use OpenAI backend (requires API key)
+python -m transcriber.cli audio.mp3 \
+  --backend openai \
+  --model whisper-1 \
+  --concurrency 2
+
+# OpenAI with language hint
+python -m transcriber.cli foreign_audio.wav \
+  --backend openai \
+  --language es \
+  --model whisper-1
 ```
 
 ### Command-Line Options
 
+#### Core Options
 ```
 positional arguments:
   input_path            Path to audio or video file to transcribe
 
-options:
+basic options:
+  --backend {whisperx,openai}
+                        Transcription backend (default: whisperx)
   --format {txt,srt,vtt}
                         Output format (default: txt)
-  --bitrate BITRATE     Audio bitrate for conversion (e.g., 128k, 192k)
-  --max-chunk-mb MAX_CHUNK_MB
-                        Maximum chunk size in MB (default: 24)
-  --min-silence-ms MIN_SILENCE_MS
-                        Minimum silence duration in milliseconds (default: 400)
-  --silence-threshold SILENCE_THRESHOLD
-                        Silence threshold in dB (default: -40)
-  --language LANGUAGE   Language hint for transcription (e.g., en, es, fr)
-  --model MODEL         OpenAI model to use (default: whisper-1)
-  --concurrency CONCURRENCY
-                        Number of concurrent API calls (default: 1)
+  --language LANGUAGE   Language hint (e.g., en, es, fr)
   --verbose             Enable verbose logging
+```
+
+#### WhisperX Options (Default Backend)
+```
+  --whisperx-model {tiny,base,small,medium,large,large-v2,large-v3}
+                        WhisperX model (default: large-v3)
+  --whisperx-device {cuda,cpu,auto}
+                        Device for inference (default: auto)
+  --whisperx-compute-type {int8,int16,float16,float32,auto}
+                        Compute precision (default: auto)
+  --whisperx-batch-size BATCH_SIZE
+                        Batch size for GPU inference (default: 16)
+  --enable-alignment    Enable word-level alignment
+  --enable-diarization  Enable speaker diarization
+  --hf-token HF_TOKEN   Hugging Face token (required for diarization)
+```
+
+#### OpenAI Options (Legacy Backend)
+```
+  --model MODEL         OpenAI model (default: gpt-4o-mini-transcribe)
+  --fallback-model MODEL
+                        Fallback model (default: whisper-1)
+  --concurrency CONCURRENCY
+                        Concurrent API calls (default: 1)
+```
+
+#### Audio Processing Options
+```
+  --bitrate BITRATE     Audio bitrate (e.g., 128k, 192k)
+  --max-chunk-mb SIZE   Maximum chunk size in MB (default: 24)
+  --min-silence-ms MS   Minimum silence duration (default: 400)
+  --silence-threshold DB
+                        Silence threshold in dB (default: -40)
 ```
 
 ## Output Files
@@ -159,15 +231,37 @@ The tool creates output files in the same directory as the input file:
 
 All settings can be configured via environment variables in the `.env` file:
 
+#### Backend Configuration
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OPENAI_API_KEY` | - | OpenAI API key (required) |
-| `OPENAI_MODEL` | `whisper-1` | Whisper model to use |
+| `TRANSCRIPTION_BACKEND` | `whisperx` | Backend to use (`whisperx` or `openai`) |
+
+#### WhisperX Settings
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WHISPERX_MODEL` | `large-v3` | WhisperX model to use |
+| `WHISPERX_DEVICE` | `auto` | Device for inference (`cuda`, `cpu`, `auto`) |
+| `WHISPERX_COMPUTE_TYPE` | `auto` | Compute precision (`int8`, `float16`, etc.) |
+| `WHISPERX_BATCH_SIZE` | `16` | Batch size for GPU inference |
+| `ENABLE_ALIGNMENT` | `true` | Enable word-level alignment |
+| `ENABLE_DIARIZATION` | `false` | Enable speaker diarization |
+| `HF_TOKEN` | - | Hugging Face token (required for diarization) |
+
+#### OpenAI Settings (Legacy)
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENAI_API_KEY` | - | OpenAI API key (required for openai backend) |
+| `OPENAI_MODEL` | `gpt-4o-mini-transcribe` | OpenAI model to use |
+| `OPENAI_FALLBACK_MODEL` | `whisper-1` | Fallback model |
+| `DEFAULT_CONCURRENCY` | `1` | Number of concurrent API calls |
+
+#### Audio Processing
+| Variable | Default | Description |
+|----------|---------|-------------|
 | `DEFAULT_BITRATE` | `128k` | Audio bitrate for conversion |
 | `DEFAULT_MAX_CHUNK_MB` | `24` | Maximum chunk size in MB |
 | `DEFAULT_MIN_SILENCE_MS` | `400` | Minimum silence duration for splitting |
 | `DEFAULT_SILENCE_THRESHOLD` | `-40` | Silence threshold in dB |
-| `DEFAULT_CONCURRENCY` | `1` | Number of concurrent API calls |
 
 ### Silence Detection Tuning
 
@@ -260,10 +354,24 @@ If chunks are being split poorly:
 
 ## Performance Notes
 
+### WhisperX (Default Backend)
+- **GPU acceleration**: 3-5x faster than CPU with CUDA
+- **Batched processing**: Efficient memory usage with configurable batch sizes
+- **Memory requirements**: 4-8GB VRAM for large models on GPU
+- **CPU fallback**: Automatic fallback to CPU if CUDA unavailable
+- **Processing speed**: ~10-30x real-time on GPU, ~2-5x on CPU
+
+### OpenAI API (Legacy Backend)
 - **Single chunk**: Files ≤24MB process as one chunk
 - **Chunking overhead**: ~2-5 seconds per chunk for splitting
 - **API timing**: ~1-3 seconds per minute of audio
 - **Concurrent processing**: Use with caution due to rate limits
+
+### Hardware Recommendations
+- **GPU**: NVIDIA GPU with 6GB+ VRAM for optimal performance
+- **CPU**: Modern multi-core processor for CPU fallback
+- **RAM**: 8GB+ system RAM for large file processing
+- **Storage**: SSD recommended for faster I/O during chunking
 
 ## Contributing
 
