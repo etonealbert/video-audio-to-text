@@ -307,6 +307,14 @@ python -m transcriber.cli sample.mp3 --verbose
 
 # Show help
 python -m transcriber.cli --help
+
+
+cd C:\Users\alber\Helpers
+$file = "rec_$((Get-Date).ToString('yyyyMMdd_HHmmss')).mp3"
+
+ffmpeg -y -f dshow -i audio="virtual-audio-capturer" `
+  -ac 2 -ar 48000 -c:a libmp3lame -b:a 192k $file
+
 ```
 
 ## Troubleshooting
