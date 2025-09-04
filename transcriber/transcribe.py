@@ -9,7 +9,7 @@ from typing import List
 
 from tqdm import tqdm
 
-from .openai_client import OpenAITranscriptionClient, create_transcription_client
+# from .openai_client import OpenAITranscriptionClient, create_transcription_client
 from .whisperx_client import WhisperXClient, create_whisperx_client, WhisperXError
 from .types import Chunk, OutputFormat, TranscriptionResult, TranscriptionSegment, WordAlignment
 
@@ -82,6 +82,8 @@ def transcribe_chunks(
     
     # Transcribe chunks based on backend
     if backend == "whisperx":
+        
+
         results = _transcribe_chunks_whisperx(
             chunks=chunks,
             language=language,
@@ -95,6 +97,11 @@ def transcribe_chunks(
             hf_token=hf_token
         )
     else:  # backend == "openai"
+        from .openai_client import (
+                OpenAITranscriptionClient,
+                create_transcription_client,
+            )
+    
         if api_key is None:
             raise ValueError("OpenAI API key required for openai backend")
         

@@ -52,31 +52,107 @@ sudo apt-get install ffmpeg
 ```
 
 **Windows:**
-```bash
+
+Option 1 - Using winget (Windows 10+):
+```powershell
 winget install ffmpeg
 ```
-Or download from [https://ffmpeg.org/](https://ffmpeg.org/)
 
-### 2. Clone and Setup
+Option 2 - Using Chocolatey:
+```powershell
+choco install ffmpeg
+```
 
+Option 3 - Manual installation:
+1. Download from [https://ffmpeg.org/download.html#build-windows](https://ffmpeg.org/download.html#build-windows)
+2. Extract to a folder (e.g., `C:\ffmpeg`)
+3. Add `C:\ffmpeg\bin` to your system PATH:
+   - Press `Win + R`, type `sysdm.cpl`, press Enter
+   - Click "Environment Variables"
+   - Under "System Variables", find and select "Path", click "Edit"
+   - Click "New" and add `C:\ffmpeg\bin`
+   - Click "OK" to save
+
+Verify installation:
+```powershell
+ffmpeg -version
+```
+
+### 2. Python Setup (Windows Only)
+
+> 📋 **For detailed Windows setup instructions, see [WINDOWS_SETUP.md](./WINDOWS_SETUP.md)**
+
+If you're on Windows and don't have Python installed:
+
+1. **Install Python 3.10+:**
+   - Download from [https://www.python.org/downloads/](https://www.python.org/downloads/)
+   - **IMPORTANT**: Check "Add Python to PATH" during installation
+   - Or use winget: `winget install Python.Python.3.11`
+
+2. **Verify Python installation:**
+   ```powershell
+   python --version
+   pip --version
+   ```
+
+3. **Enable PowerShell script execution (if needed):**
+   ```powershell
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+   ```
+
+### 3. Clone and Setup
+
+**Unix/macOS:**
 ```bash
 git clone <repository-url>
 cd video-audio-to-text
 
 # Create virtual environment
 python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
 ```
 
-### 3. Configure Environment
+**Windows PowerShell:**
+```powershell
+git clone <repository-url>
+cd video-audio-to-text
+
+# Create virtual environment
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+**Windows Command Prompt:**
+```cmd
+git clone <repository-url>
+cd video-audio-to-text
+
+# Create virtual environment
+python -m venv .venv
+.venv\Scripts\activate.bat
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 4. Configure Environment
 
 Copy the example environment file and configure it:
 
+**Unix/macOS:**
 ```bash
 cp env.example .env
+```
+
+**Windows:**
+```powershell
+Copy-Item env.example .env
 ```
 
 Edit `.env` with your settings:
@@ -106,6 +182,7 @@ DEFAULT_MAX_CHUNK_MB=24
 
 ### Basic Usage (WhisperX - Default)
 
+**Unix/macOS:**
 ```bash
 # Basic transcription (GPU-accelerated)
 python -m transcriber.cli audio.mp3
@@ -121,8 +198,25 @@ python -m transcriber.cli "inputs/interview.pcm" \
   --pcm-sample-rate 24000 --pcm-channels 2 --pcm-bit-depth 16 --pcm-format s16le
 ```
 
+**Windows PowerShell:**
+```powershell
+# Basic transcription (GPU-accelerated)
+python -m transcriber.cli audio.mp3
+
+# Generate SRT subtitles with speaker labels
+python -m transcriber.cli interview.m4a --format srt --enable-diarization
+
+# High-quality transcription with word alignment
+python -m transcriber.cli podcast.wav --format vtt --enable-alignment
+
+# PCM file transcription (use quotes for paths with spaces)
+python -m transcriber.cli "inputs/interview.pcm" `
+  --pcm-sample-rate 24000 --pcm-channels 2 --pcm-bit-depth 16 --pcm-format s16le
+```
+
 ### WhisperX Advanced Options
 
+**Unix/macOS:**
 ```bash
 # Large file with GPU optimization
 python -m transcriber.cli large_file.mp4 \
@@ -144,8 +238,31 @@ python -m transcriber.cli foreign_audio.wav \
   --whisperx-compute-type float16
 ```
 
+**Windows PowerShell:**
+```powershell
+# Large file with GPU optimization
+python -m transcriber.cli large_file.mp4 `
+  --whisperx-model large-v3 `
+  --whisperx-batch-size 32 `
+  --whisperx-device cuda `
+  --enable-alignment `
+  --enable-diarization
+
+# CPU-only processing
+python -m transcriber.cli audio.mp3 `
+  --whisperx-device cpu `
+  --whisperx-compute-type int8
+
+# Specific language and model
+python -m transcriber.cli foreign_audio.wav `
+  --language es `
+  --whisperx-model medium `
+  --whisperx-compute-type float16
+```
+
 ### Legacy OpenAI API Usage
 
+**Unix/macOS:**
 ```bash
 # Use OpenAI backend (requires API key)
 python -m transcriber.cli audio.mp3 \
@@ -157,6 +274,21 @@ python -m transcriber.cli audio.mp3 \
 python -m transcriber.cli foreign_audio.wav \
   --backend openai \
   --language es \
+  --model whisper-1
+```
+
+**Windows PowerShell:**
+```powershell
+# Use OpenAI backend (requires API key)
+python -m transcriber.cli audio.mp3 `
+  --backend openai `
+  --model whisper-1 `
+  --concurrency 2
+
+# OpenAI with language hint
+python -m transcriber.cli foreign_audio.wav `
+  --backend openai `
+  --language es `
   --model whisper-1
 ```
 
@@ -274,17 +406,43 @@ For optimal chunking results, you may need to adjust silence detection parameter
 
 ### Setup Development Environment
 
+**Unix/macOS (using Make):**
 ```bash
 # Install dependencies
 make venv
 source .venv/bin/activate
-source .venv/bin/activate && python -m transcriber.cli "inputs/МИАНовостиPythonSenior.WAV"
+
 # Or manually:
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+```
+
+**Windows PowerShell:**
+```powershell
+# Manual setup
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+# Or use the automated setup script (recommended)
+.\scripts\setup.ps1
+```
+
+**Windows Command Prompt:**
+```cmd
+# Manual setup
+python -m venv .venv
+.venv\Scripts\activate.bat
+pip install -r requirements.txt
+
+# Or use the automated setup script (recommended)
+scripts\setup.bat
 ```
 
 ### Code Quality
 
+**Unix/macOS:**
 ```bash
 # Format code
 make format
@@ -299,25 +457,85 @@ make type
 # or: mypy transcriber --strict
 ```
 
+**Windows PowerShell:**
+```powershell
+# Format code
+ruff format .
+
+# Lint code
+ruff check .
+
+# Type check
+mypy transcriber --strict
+
+# Or use the provided scripts (recommended)
+.\scripts\format.ps1
+.\scripts\lint.ps1
+.\scripts\type-check.ps1
+```
+
 ### Testing
 
+**Unix/macOS:**
 ```bash
 # Test with sample file
 python -m transcriber.cli sample.mp3 --verbose
 
 # Show help
 python -m transcriber.cli --help
+```
 
+**Windows PowerShell:**
+```powershell
+# Test with sample file
+python -m transcriber.cli sample.mp3 --verbose
 
+# Show help
+python -m transcriber.cli --help
+
+# Test recording and transcription (Windows-specific)
 cd C:\Users\alber\Helpers
 $file = "rec_$((Get-Date).ToString('yyyyMMdd_HHmmss')).mp3"
 
+# Record audio using virtual audio capturer
 ffmpeg -y -f dshow -i audio="virtual-audio-capturer" `
   -ac 2 -ar 48000 -c:a libmp3lame -b:a 192k $file
 
-
+# Or record to WAV
 ffmpeg -y -f dshow -i audio="virtual-audio-capturer" out.wav
 ```
+
+## Windows Scripts
+
+> 📋 **For complete Windows setup instructions, see [WINDOWS_SETUP.md](./WINDOWS_SETUP.md)**
+
+The `scripts/` directory contains Windows-specific helper scripts for easier project management:
+
+### PowerShell Scripts (Recommended)
+
+- **Setup**: `.\scripts\setup.ps1` - Complete project setup with virtual environment
+- **Transcription**: `.\scripts\transcribe.ps1` - Enhanced transcription with parameter support
+- **Development**: `.\scripts\format.ps1`, `.\scripts\lint.ps1`, `.\scripts\type-check.ps1`
+- **Cleanup**: `.\scripts\clean.ps1` - Clean temporary files and caches
+
+### Batch Scripts (CMD Compatible)
+
+- **Setup**: `scripts\setup.bat` - Basic project setup
+- **Transcription**: `scripts\run-transcriber.bat` - Simple transcription wrapper
+
+### Quick Start with Scripts
+
+```powershell
+# PowerShell (recommended)
+.\scripts\setup.ps1                    # Set up everything
+.\scripts\transcribe.ps1 audio.mp3 -VerboseLogging     # Transcribe a file
+
+# Command Prompt
+scripts\setup.bat                      # Set up everything  
+scripts\run-transcriber.bat audio.mp3  # Transcribe a file
+```
+
+See `scripts/README.md` for detailed documentation on all available scripts.
 
 ## Troubleshooting
 
@@ -353,6 +571,36 @@ If chunks are being split poorly:
 - Adjust `--min-silence-ms` (try 200-800ms)
 - Modify `--silence-threshold` (try -30 to -50 dB)
 - Check audio quality and background noise levels
+
+### Windows-Specific Issues
+
+**PowerShell Execution Policy Error:**
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+**Python Command Not Found (Windows):**
+- Ensure Python is installed from [python.org](https://www.python.org/downloads/)
+- During installation, check "Add Python to PATH"
+- Restart your terminal after installation
+
+**Virtual Environment Activation Issues:**
+```powershell
+# PowerShell
+.venv\Scripts\Activate.ps1
+
+# Command Prompt
+.venv\Scripts\activate.bat
+```
+
+**Path Issues with Spaces:**
+Use quotes around file paths containing spaces:
+```powershell
+python -m transcriber.cli "C:\My Files\audio file.mp3"
+```
+
+**Permission Denied Errors:**
+Run PowerShell or Command Prompt as Administrator if you encounter permission issues during setup.
 
 ## Exit Codes
 
